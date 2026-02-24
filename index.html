@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube to MP3</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0f0f0f;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #e8e8e8;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .logo svg {
+      width: 40px;
+      height: 40px;
+    }
+
+    .logo h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .logo span {
+      color: #ff4444;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #888;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: #111;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 0.95rem;
+      color: #e8e8e8;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]::placeholder { color: #555; }
+
+    input[type="text"]:focus {
+      border-color: #ff4444;
+    }
+
+    button {
+      background: #ff4444;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 14px 22px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    button:hover:not(:disabled) { background: #e03333; }
+    button:active:not(:disabled) { transform: scale(0.98); }
+    button:disabled { background: #444; cursor: not-allowed; }
+
+    .status {
+      min-height: 56px;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #888;
+    }
+
+    .status.info    { color: #aaa; border-color: #333; }
+    .status.loading { color: #ffa500; border-color: #553300; }
+    .status.success { color: #44bb44; border-color: #1a4a1a; }
+    .status.error   { color: #ff5555; border-color: #4a1a1a; }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid #553300;
+      border-top-color: #ffa500;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: currentColor;
+    }
+
+    .tip {
+      margin-top: 20px;
+      font-size: 0.78rem;
+      color: #444;
+      text-align: center;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <!-- YouTube-style play icon -->
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="40" height="40" rx="10" fill="#ff4444"/>
+        <polygon points="15,11 15,29 30,20" fill="white"/>
+      </svg>
+      <h1>YouTube to <span>MP3</span></h1>
+    </div>
+
+    <label for="urlInput">YouTube URL</label>
+    <div class="input-row">
+      <input
+        type="text"
+        id="urlInput"
+        placeholder="https://www.youtube.com/watch?v=..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button id="downloadBtn" onclick="startDownload()">Download</button>
+    </div>
+
+    <div class="status info" id="status">
+      <span class="dot"></span>
+      <span>Paste a YouTube link and hit Download</span>
+    </div>
+
+    <p class="tip">Audio is downloaded at 192 kbps. Large videos may take a moment.</p>
+  </div>
+
+  <script>
+    const urlInput = document.getElementById("urlInput");
+    const statusEl = document.getElementById("status");
+    const btn = document.getElementById("downloadBtn");
+
+    urlInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") startDownload();
+    });
+
+    function setStatus(type, icon, message) {
+      statusEl.className = `status ${type}`;
+      statusEl.innerHTML = `<span class="${icon}"></span><span>${message}</span>`;
+    }
+
+    async function startDownload() {
+      const url = urlInput.value.trim();
+      if (!url) {
+        setStatus("error", "dot", "Please enter a YouTube URL.");
+        return;
+      }
+
+      btn.disabled = true;
+      setStatus("loading", "spinner", "Fetching and converting audio — please wait...");
+
+      try {
+        const response = await fetch("/download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error || "Download failed");
+        }
+
+        // Get filename from Content-Disposition header if available
+        const disposition = response.headers.get("Content-Disposition");
+        let filename = "audio.mp3";
+        if (disposition) {
+          const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (match) filename = decodeURIComponent(match[1].replace(/['"]/g, ""));
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = objectUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+
+        setStatus("success", "dot", `Downloaded: ${filename}`);
+      } catch (err) {
+        setStatus("error", "dot", `Error: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
